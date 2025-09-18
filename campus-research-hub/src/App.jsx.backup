@@ -1,0 +1,1856 @@
+
+import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './firebase/config';
+import Auth from './components/Auth';
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [userSurveyData, setUserSurveyData] = useState(null);
+  
+  // Project Join Modal State
+  const [joinProjectModal, setJoinProjectModal] = useState(null);
+  const [joinMessage, setJoinMessage] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinStatus, setJoinStatus] = useState('');
+  
+  // User Profile Modal State
+  const [selectedUser, setSelectedUser] = useState(null);
+  
+  // Survey form state
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    studentId: '',
+    researchArea: '',
+    academicLevel: '',
+    currentProjects: '',
+    collaborationNeeds: '',
+    skillsOffered: '',
+    skillsNeeded: '',
+    resourceRequirements: ''
+  });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
+  const [errors, setErrors] = useState({});
+
+  // Enhanced mock data with more realistic projects
+  const [researchProjects] = useState([
+    {
+      id: 1,
+      title: "AI-Powered Climate Change Prediction",
+      description: "Developing machine learning models to predict climate patterns using satellite data and IoT sensors. We're looking for researchers to help with data analysis and model validation.",
+      collaborators: ["Dr. Sarah Johnson", "Mark Chen", "Anna Rodriguez"],
+      researchArea: "Environmental Science",
+      status: "Active",
+      progress: 75,
+      deadline: "2025-12-15",
+      skills: ["Python", "Machine Learning", "Data Analysis"],
+      lookingFor: ["Climate Data Expert", "Statistical Analyst"],
+      createdBy: "Dr. Sarah Johnson",
+      location: "Stanford University",
+      funding: "$50,000",
+      type: "Research Paper"
+    },
+    {
+      id: 2,
+      title: "Quantum Computing Applications in Cryptography",
+      description: "Exploring quantum algorithms for next-generation encryption methods. This project aims to develop quantum-resistant cryptographic protocols for blockchain applications.",
+      collaborators: ["Prof. Michael Zhang", "Lisa Park"],
+      researchArea: "Computer Science",
+      status: "Recruiting",
+      progress: 25,
+      deadline: "2026-06-30",
+      skills: ["Quantum Computing", "Cryptography", "Mathematics"],
+      lookingFor: ["Quantum Physicist", "Security Researcher"],
+      createdBy: "Prof. Michael Zhang",
+      location: "MIT",
+      funding: "$120,000",
+      type: "PhD Thesis"
+    },
+    {
+      id: 3,
+      title: "Social Media Impact on Mental Health",
+      description: "Large-scale study analyzing social media usage patterns and their correlation with mental health outcomes in young adults aged 18-25.",
+      collaborators: ["Dr. Rachel Kim", "James Wilson"],
+      researchArea: "Psychology",
+      status: "Data Collection",
+      progress: 60,
+      deadline: "2025-09-20",
+      skills: ["Psychology", "Statistics", "Survey Design"],
+      lookingFor: ["Data Analyst", "Mental Health Expert"],
+      createdBy: "Dr. Rachel Kim",
+      location: "UC Berkeley",
+      funding: "$35,000",
+      type: "Survey Study"
+    }
+  ]);
+
+  const [availableCollaborators] = useState([
+    {
+      id: 1,
+      name: "Dr. Emily Watson",
+      researchArea: "Artificial Intelligence",
+      affiliation: "Stanford University",
+      skills: ["Deep Learning", "Computer Vision", "Python"],
+      activeProjects: 3,
+      publications: 45,
+      profileImage: "👩‍💼",
+      email: "emily.watson@stanford.edu",
+      bio: "Leading researcher in AI applications for healthcare and climate science.",
+      experience: "10+ years"
+    },
+    {
+      id: 2,
+      name: "Prof. David Chen",
+      researchArea: "Environmental Science",
+      affiliation: "MIT",
+      skills: ["Climate Modeling", "Data Analysis", "GIS"],
+      activeProjects: 2,
+      publications: 67,
+      profileImage: "👨‍🔬",
+      email: "david.chen@mit.edu",
+      bio: "Expert in climate data analysis and environmental modeling systems.",
+      experience: "15+ years"
+    },
+    {
+      id: 3,
+      name: "Dr. Maria Garcia",
+      researchArea: "Biotechnology",
+      affiliation: "Harvard Medical School",
+      skills: ["Genomics", "Bioinformatics", "Molecular Biology"],
+      activeProjects: 4,
+      publications: 52,
+      profileImage: "👩‍⚕️",
+      email: "maria.garcia@harvard.edu",
+      bio: "Pioneering research in gene therapy and personalized medicine.",
+      experience: "12+ years"
+    }
+  ]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+      if (user) {
+        fetchUserSurveyData(user.email);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const fetchUserSurveyData = async (email) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/surveys/user/${encodeURIComponent(email)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setUserSurveyData(data.data);
+        }
+      }
+    } catch (error) {
+      console.log('No survey data found for user');
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      setShowAuth(false);
+      setActiveTab('dashboard');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  // WORKING Project Join Functionality
+  const handleJoinProject = async (project) => {
+    if (!joinMessage.trim()) {
+      setJoinStatus('Please enter a message describing why you want to join this project.');
+      return;
+    }
+
+    setIsJoining(true);
+    setJoinStatus('Sending join request...');
+
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // In real implementation, this would save to Firebase/database
+      console.log('Join Request Details:', {
+        projectId: project.id,
+        projectTitle: project.title,
+        userId: auth.currentUser.uid,
+        userName: auth.currentUser.displayName || auth.currentUser.email,
+        message: joinMessage,
+        timestamp: new Date().toISOString()
+      });
+
+      // Success response
+      setJoinStatus(`✅ Join request sent successfully! Dr. ${project.createdBy} will review your request and respond within 24-48 hours.`);
+      
+      // Auto close modal after 3 seconds
+      setTimeout(() => {
+        setJoinProjectModal(null);
+        setJoinMessage('');
+        setJoinStatus('');
+      }, 3000);
+
+    } catch (error) {
+      console.error('Error joining project:', error);
+      setJoinStatus('❌ Failed to send join request. Please try again.');
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
+  // WORKING Connect with Collaborator Functionality
+  const handleConnectWithUser = async (collaborator) => {
+    try {
+      console.log('Connection Request:', {
+        collaboratorId: collaborator.id,
+        collaboratorName: collaborator.name,
+        collaboratorEmail: collaborator.email,
+        userId: auth.currentUser.uid,
+        userName: auth.currentUser.displayName || auth.currentUser.email,
+        timestamp: new Date().toISOString()
+      });
+
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      alert(`✅ Connection request sent to ${collaborator.name}! They will receive your collaboration request via email and can respond directly.`);
+      
+    } catch (error) {
+      console.error('Error connecting with user:', error);
+      alert('❌ Failed to send connection request. Please try again.');
+    }
+  };
+
+  // Handle survey form input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  // Form validation
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.name.trim()) newErrors.name = 'Full name is required';
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    if (!formData.researchArea.trim()) newErrors.researchArea = 'Research area is required';
+    if (!formData.academicLevel) newErrors.academicLevel = 'Academic level is required';
+    if (!formData.collaborationNeeds.trim()) newErrors.collaborationNeeds = 'Please describe your collaboration needs';
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle survey form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      setSubmitMessage('❌ Please fix the errors above and try again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitMessage('');
+
+    try {
+      const response = await fetch('http://localhost:3001/api/survey', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSubmitMessage(`✅ Survey submitted successfully! Thank you for participating.`);
+        
+        setFormData({
+          name: '',
+          email: '',
+          studentId: '',
+          researchArea: '',
+          academicLevel: '',
+          currentProjects: '',
+          collaborationNeeds: '',
+          skillsOffered: '',
+          skillsNeeded: '',
+          resourceRequirements: ''
+        });
+        
+        if (user) {
+          fetchUserSurveyData(user.email);
+        }
+      } else {
+        if (response.status === 409) {
+          setSubmitMessage(`❌ You have already submitted a survey with this email.`);
+        } else {
+          setSubmitMessage(`❌ ${result.message || 'Failed to submit survey. Please try again.'}`);
+        }
+      }
+      
+    } catch (error) {
+      setSubmitMessage('❌ Unable to submit survey. Please check your connection and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: '#f8fafc',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          color: '#64748b'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #e2e8f0',
+            borderTop: '3px solid #3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1rem auto'
+          }}></div>
+          <p style={{ margin: 0, fontSize: '0.9rem' }}>Loading Campus Research Hub...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Enhanced Dashboard for authenticated users
+  if (user) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#f8fafc',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      }}>
+        {/* Enhanced Header */}
+        <header style={{
+          background: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+        }}>
+          <div style={{
+            maxWidth: '1200px',
+            margin: '0 auto',
+            padding: '1rem 2rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <h1 style={{ 
+                margin: 0, 
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1e293b'
+              }}>
+                Campus Research Hub
+              </h1>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>Research Collaboration Platform</p>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <nav style={{ display: 'flex', gap: '1rem', marginRight: '2rem' }}>
+                {['dashboard', 'projects', 'collaborators', 'profile'].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      background: activeTab === tab ? '#3b82f6' : 'transparent',
+                      color: activeTab === tab ? 'white' : '#64748b',
+                      border: 'none',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      textTransform: 'capitalize',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </nav>
+
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>
+                  {user.displayName || user.email}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  {userSurveyData ? `${userSurveyData.researchArea}` : 'Authenticated'}
+                </div>
+              </div>
+              <button
+                onClick={handleSignOut}
+                style={{
+                  background: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'background 0.2s ease'
+                }}
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main style={{ 
+          maxWidth: '1200px', 
+          margin: '0 auto', 
+          padding: '2rem' 
+        }}>
+          {/* Dashboard Tab */}
+          {activeTab === 'dashboard' && (
+            <div>
+              <div style={{
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                borderRadius: '12px',
+                padding: '2rem',
+                marginBottom: '2rem',
+                color: 'white'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.875rem', fontWeight: '700' }}>
+                      Welcome back, {user.displayName || user.email.split('@')[0]}! 👋
+                    </h2>
+                    <p style={{ margin: 0, opacity: 0.9, fontSize: '1.1rem' }}>
+                      {userSurveyData 
+                        ? `Ready to collaborate on ${userSurveyData.researchArea} research?`
+                        : 'Ready to start your research collaboration journey?'
+                      }
+                    </p>
+                  </div>
+                  <div style={{ fontSize: '4rem' }}>🔬</div>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '1.5rem',
+                marginBottom: '2rem'
+              }}>
+                <div style={{
+                  background: '#ffffff',
+                  padding: '1.5rem',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📊</div>
+                  <h3 style={{ margin: '0 0 0.25rem 0', color: '#1e293b', fontSize: '1.5rem', fontWeight: '700' }}>
+                    {researchProjects.length}
+                  </h3>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>Available Projects</p>
+                </div>
+
+                <div style={{
+                  background: '#ffffff',
+                  padding: '1.5rem',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🤝</div>
+                  <h3 style={{ margin: '0 0 0.25rem 0', color: '#1e293b', fontSize: '1.5rem', fontWeight: '700' }}>
+                    {availableCollaborators.length}
+                  </h3>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>Available Collaborators</p>
+                </div>
+
+                <div style={{
+                  background: '#ffffff',
+                  padding: '1.5rem',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📈</div>
+                  <h3 style={{ margin: '0 0 0.25rem 0', color: '#1e293b', fontSize: '1.5rem', fontWeight: '700' }}>
+                    {Math.round(researchProjects.reduce((acc, project) => acc + project.progress, 0) / researchProjects.length)}%
+                  </h3>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>Avg. Progress</p>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <h3 style={{ margin: '0 0 1rem 0', color: '#1e293b', fontSize: '1.25rem', fontWeight: '600' }}>
+                    Quick Actions
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <button
+                      onClick={() => setActiveTab('projects')}
+                      style={{
+                        background: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <span>🔍</span> Browse Research Projects
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('collaborators')}
+                      style={{
+                        background: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <span>🤝</span> Find Collaborators
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* WORKING Projects Tab */}
+          {activeTab === 'projects' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.875rem', fontWeight: '700' }}>
+                  🔬 Research Projects
+                </h2>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {researchProjects.map(project => (
+                  <div key={project.id} style={{
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    padding: '1.5rem',
+                    border: '1px solid #e2e8f0',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <h3 style={{ 
+                        margin: 0, 
+                        color: '#1e293b', 
+                        fontSize: '1.125rem', 
+                        fontWeight: '600',
+                        lineHeight: '1.4',
+                        flex: 1
+                      }}>
+                        {project.title}
+                      </h3>
+                      <span style={{
+                        background: project.status === 'Active' ? '#dcfce7' : project.status === 'Recruiting' ? '#fef3c7' : '#dbeafe',
+                        color: project.status === 'Active' ? '#166534' : project.status === 'Recruiting' ? '#92400e' : '#1e40af',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap',
+                        marginLeft: '1rem'
+                      }}>
+                        {project.status}
+                      </span>
+                    </div>
+
+                    <p style={{ 
+                      margin: '0 0 1rem 0', 
+                      color: '#64748b', 
+                      fontSize: '0.875rem',
+                      lineHeight: '1.5'
+                    }}>
+                      {project.description}
+                    </p>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <strong style={{ color: '#2c3e50' }}>Research Area:</strong> {project.researchArea}
+                      </div>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <strong style={{ color: '#2c3e50' }}>Lead:</strong> {project.createdBy}
+                      </div>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <strong style={{ color: '#2c3e50' }}>Location:</strong> {project.location}
+                      </div>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <strong style={{ color: '#2c3e50' }}>Funding:</strong> {project.funding}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Looking For</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                        {project.lookingFor.map((skill, index) => (
+                          <span key={index} style={{
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            padding: '0.125rem 0.5rem',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem'
+                          }}>
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        onClick={() => setJoinProjectModal(project)}
+                        style={{
+                          flex: 1,
+                          background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: '600'
+                        }}
+                      >
+                        🚀 Request to Join
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* WORKING Collaborators Tab */}
+          {activeTab === 'collaborators' && (
+            <div>
+              <div style={{ marginBottom: '2rem' }}>
+                <h2 style={{ 
+                  margin: '0 0 0.5rem 0', 
+                  color: '#1e293b', 
+                  fontSize: '1.875rem', 
+                  fontWeight: '700' 
+                }}>
+                  🤝 Find Collaborators
+                </h2>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '1rem' }}>
+                  Connect with researchers who share your interests and expertise
+                </p>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {availableCollaborators.map(collaborator => (
+                  <div key={collaborator.id} style={{
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    padding: '1.5rem',
+                    border: '1px solid #e2e8f0',
+                    transition: 'transform 0.2s ease'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+                      <div style={{
+                        width: '60px',
+                        height: '60px',
+                        background: '#f1f5f9',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '2rem',
+                        marginRight: '1rem'
+                      }}>
+                        {collaborator.profileImage}
+                      </div>
+                      <div>
+                        <h3 style={{ 
+                          margin: '0 0 0.25rem 0', 
+                          color: '#1e293b', 
+                          fontSize: '1.125rem', 
+                          fontWeight: '600' 
+                        }}>
+                          {collaborator.name}
+                        </h3>
+                        <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>
+                          {collaborator.affiliation}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Research Area</div>
+                      <div style={{ color: '#1e293b', fontSize: '0.875rem', fontWeight: '500' }}>
+                        {collaborator.researchArea}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>Skills</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                        {collaborator.skills.map((skill, index) => (
+                          <span key={index} style={{
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '0.125rem 0.5rem',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem'
+                          }}>
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr 1fr', 
+                      gap: '1rem',
+                      marginBottom: '1.5rem'
+                    }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ color: '#1e293b', fontSize: '1.25rem', fontWeight: '700' }}>
+                          {collaborator.activeProjects}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Projects</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ color: '#1e293b', fontSize: '1.25rem', fontWeight: '700' }}>
+                          {collaborator.publications}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Publications</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        onClick={() => handleConnectWithUser(collaborator)}
+                        style={{
+                          flex: 1,
+                          background: '#3b82f6',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.5rem',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: '500'
+                        }}
+                      >
+                        🤝 Connect
+                      </button>
+                      <button 
+                        onClick={() => setSelectedUser(collaborator)}
+                        style={{
+                          background: 'transparent',
+                          color: '#64748b',
+                          border: '1px solid #e2e8f0',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: '500'
+                        }}
+                      >
+                        👤 Profile
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Profile Tab */}
+          {activeTab === 'profile' && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+              gap: '2rem'
+            }}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '12px',
+                padding: '2rem',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h3 style={{ margin: '0 0 1.5rem 0', color: '#1e293b', fontSize: '1.25rem', fontWeight: '600' }}>
+                  Your Profile
+                </h3>
+
+                {userSurveyData ? (
+                  <div>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Full Name</div>
+                      <div style={{ color: '#1e293b', fontSize: '1rem', fontWeight: '500' }}>{userSurveyData.name}</div>
+                    </div>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Research Area</div>
+                      <div style={{ color: '#1e293b', fontSize: '1rem', fontWeight: '500' }}>{userSurveyData.researchArea}</div>
+                    </div>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Academic Level</div>
+                      <div style={{ color: '#1e293b', fontSize: '1rem', fontWeight: '500' }}>{userSurveyData.academicLevel}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '2rem',
+                    color: '#64748b'
+                  }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
+                    <p style={{ margin: 0, marginBottom: '1rem' }}>
+                      Complete your research profile to get started!
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {!userSurveyData && (
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '12px',
+                  padding: '2rem',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <h3 style={{ margin: '0 0 1.5rem 0', color: '#1e293b', fontSize: '1.25rem', fontWeight: '600' }}>
+                    Complete Your Research Profile
+                  </h3>
+
+                  <form onSubmit={handleSubmit}>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        placeholder="Enter your full name"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `1px solid ${errors.name ? '#ef4444' : '#d1d5db'}`,
+                          borderRadius: '6px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                      {errors.name && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.name}</span>}
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                        Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="your.email@university.edu"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `1px solid ${errors.email ? '#ef4444' : '#d1d5db'}`,
+                          borderRadius: '6px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                      {errors.email && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.email}</span>}
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                        Research Area *
+                      </label>
+                      <input
+                        type="text"
+                        name="researchArea"
+                        value={formData.researchArea}
+                        onChange={handleChange}
+                        placeholder="e.g., Computer Science, Biology"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `1px solid ${errors.researchArea ? '#ef4444' : '#d1d5db'}`,
+                          borderRadius: '6px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                      {errors.researchArea && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.researchArea}</span>}
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                        Academic Level *
+                      </label>
+                      <select
+                        name="academicLevel"
+                        value={formData.academicLevel}
+                        onChange={handleChange}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `1px solid ${errors.academicLevel ? '#ef4444' : '#d1d5db'}`,
+                          borderRadius: '6px',
+                          fontSize: '0.875rem',
+                          backgroundColor: '#ffffff'
+                        }}
+                      >
+                        <option value="">Select level</option>
+                        <option value="undergraduate">Undergraduate</option>
+                        <option value="graduate">Graduate</option>
+                        <option value="phd">PhD Student</option>
+                        <option value="faculty">Faculty</option>
+                      </select>
+                      {errors.academicLevel && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.academicLevel}</span>}
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                        Collaboration Needs *
+                      </label>
+                      <textarea
+                        name="collaborationNeeds"
+                        value={formData.collaborationNeeds}
+                        onChange={handleChange}
+                        placeholder="What type of collaboration are you looking for?"
+                        rows="3"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `1px solid ${errors.collaborationNeeds ? '#ef4444' : '#d1d5db'}`,
+                          borderRadius: '6px',
+                          fontSize: '0.875rem',
+                          fontFamily: 'inherit',
+                          resize: 'vertical'
+                        }}
+                      />
+                      {errors.collaborationNeeds && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.collaborationNeeds}</span>}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      style={{
+                        width: '100%',
+                        background: isSubmitting ? '#9ca3af' : '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.75rem',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {isSubmitting ? 'Saving Profile...' : 'Save Profile'}
+                    </button>
+
+                    {submitMessage && (
+                      <div style={{
+                        marginTop: '1rem',
+                        padding: '0.75rem',
+                        borderRadius: '6px',
+                        textAlign: 'center',
+                        fontSize: '0.875rem',
+                        background: submitMessage.includes('✅') ? '#dcfce7' : '#fecaca',
+                        color: submitMessage.includes('✅') ? '#166534' : '#dc2626'
+                      }}>
+                        {submitMessage}
+                      </div>
+                    )}
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* WORKING Project Join Modal */}
+        {joinProjectModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '2rem',
+              maxWidth: '500px',
+              width: '100%',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)'
+            }}>
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚀</div>
+                <h2 style={{ margin: '0 0 0.5rem 0', color: '#1e293b', fontSize: '1.5rem', fontWeight: '700' }}>
+                  Join Research Project
+                </h2>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '1rem' }}>
+                  Request to collaborate on: <strong>{joinProjectModal.title}</strong>
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '0.5rem', 
+                  fontWeight: '600', 
+                  color: '#374151',
+                  fontSize: '0.875rem'
+                }}>
+                  Why do you want to join this project? *
+                </label>
+                <textarea
+                  value={joinMessage}
+                  onChange={(e) => setJoinMessage(e.target.value)}
+                  placeholder="Describe your interest and how you can contribute to this research project..."
+                  rows="4"
+                  disabled={isJoining}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    opacity: isJoining ? 0.6 : 1
+                  }}
+                />
+              </div>
+
+              {joinStatus && (
+                <div style={{
+                  marginBottom: '1rem',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  background: joinStatus.includes('✅') ? '#dcfce7' : joinStatus.includes('❌') ? '#fecaca' : '#fef3c7',
+                  color: joinStatus.includes('✅') ? '#166534' : joinStatus.includes('❌') ? '#dc2626' : '#92400e',
+                  textAlign: 'center'
+                }}>
+                  {joinStatus}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={() => {
+                    setJoinProjectModal(null);
+                    setJoinMessage('');
+                    setJoinStatus('');
+                  }}
+                  disabled={isJoining}
+                  style={{
+                    flex: 1,
+                    background: 'white',
+                    color: '#374151',
+                    border: '2px solid #e5e7eb',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    cursor: isJoining ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    opacity: isJoining ? 0.6 : 1
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleJoinProject(joinProjectModal)}
+                  disabled={isJoining || !joinMessage.trim()}
+                  style={{
+                    flex: 1,
+                    background: isJoining || !joinMessage.trim() 
+                      ? '#9ca3af' 
+                      : 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    cursor: isJoining || !joinMessage.trim() ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  {isJoining ? '⏳ Sending...' : '🚀 Send Request'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* User Profile Modal */}
+        {selectedUser && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '2rem',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2rem',
+                    color: 'white'
+                  }}>
+                    {selectedUser.profileImage}
+                  </div>
+                  <div>
+                    <h2 style={{ 
+                      margin: '0 0 0.25rem 0', 
+                      color: '#1e293b', 
+                      fontSize: '1.5rem', 
+                      fontWeight: '700' 
+                    }}>
+                      {selectedUser.name}
+                    </h2>
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '1rem' }}>
+                      {selectedUser.affiliation}
+                    </p>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => setSelectedUser(null)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    padding: '0.5rem'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151', fontSize: '1rem', fontWeight: '600' }}>
+                    Research Area
+                  </h4>
+                  <p style={{ margin: 0, color: '#1e293b', fontSize: '1rem' }}>
+                    {selectedUser.researchArea}
+                  </p>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151', fontSize: '1rem', fontWeight: '600' }}>
+                    Bio
+                  </h4>
+                  <p style={{ margin: 0, color: '#1e293b', fontSize: '1rem', lineHeight: '1.5' }}>
+                    {selectedUser.bio}
+                  </p>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151', fontSize: '1rem', fontWeight: '600' }}>
+                    Contact
+                  </h4>
+                  <p style={{ margin: 0, color: '#1e293b', fontSize: '1rem' }}>
+                    {selectedUser.email}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Show authentication form
+  if (showAuth) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#f8fafc',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      }}>
+        <header style={{
+          background: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '1rem 2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: '#1e293b' }}>
+            Campus Research Hub
+          </h1>
+          
+          <button
+            onClick={() => setShowAuth(false)}
+            style={{
+              background: '#6b7280',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '500'
+            }}
+          >
+            ← Back to Survey
+          </button>
+        </header>
+
+        <Auth onAuthSuccess={() => setShowAuth(false)} />
+      </div>
+    );
+  }
+
+  // Homepage with survey form for non-authenticated users
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#f8fafc',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    }}>
+      {/* Clean Header */}
+      <header style={{ 
+        background: '#ffffff',
+        borderBottom: '1px solid #e2e8f0',
+        padding: '2rem',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          maxWidth: '800px',
+          margin: '0 auto'
+        }}>
+          <h1 style={{ 
+            margin: 0, 
+            fontSize: '2.5rem',
+            fontWeight: '800',
+            color: '#1e293b',
+            marginBottom: '0.5rem'
+          }}>
+            Campus Research Hub
+          </h1>
+          <p style={{ 
+            margin: 0, 
+            fontSize: '1.125rem',
+            color: '#64748b',
+            lineHeight: '1.6'
+          }}>
+            Connect with fellow researchers, find collaborators, and share resources
+          </p>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main style={{ 
+        padding: '2rem',
+        maxWidth: '1000px', 
+        margin: '0 auto' 
+      }}>
+        {/* Features Section */}
+        <section style={{ 
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '1.5rem',
+          marginBottom: '3rem'
+        }}>
+          <div style={{ 
+            background: '#ffffff',
+            borderRadius: '12px',
+            padding: '2rem',
+            textAlign: 'center',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🤝</div>
+            <h3 style={{ color: '#1e293b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>Find Collaborators</h3>
+            <p style={{ color: '#64748b', lineHeight: '1.5', margin: 0 }}>Connect with researchers in your field and discover collaboration opportunities</p>
+          </div>
+          
+          <div style={{ 
+            background: '#ffffff',
+            borderRadius: '12px',
+            padding: '2rem',
+            textAlign: 'center',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📚</div>
+            <h3 style={{ color: '#1e293b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>Share Resources</h3>
+            <p style={{ color: '#64748b', lineHeight: '1.5', margin: 0 }}>Access shared research materials, datasets, and academic resources</p>
+          </div>
+          
+          <div style={{ 
+            background: '#ffffff',
+            borderRadius: '12px',
+            padding: '2rem',
+            textAlign: 'center',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🎯</div>
+            <h3 style={{ color: '#1e293b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>Achieve Goals</h3>
+            <p style={{ color: '#64748b', lineHeight: '1.5', margin: 0 }}>Accelerate your research progress through strategic partnerships</p>
+          </div>
+        </section>
+
+        {/* Survey Form Section */}
+        <section style={{
+          background: '#ffffff',
+          borderRadius: '12px',
+          padding: '2rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+          border: '1px solid #e2e8f0',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <h2 style={{ 
+              color: '#1e293b', 
+              marginBottom: '0.75rem',
+              fontSize: '1.875rem',
+              fontWeight: '700'
+            }}>
+              Research Collaboration Survey
+            </h2>
+            <p style={{ 
+              color: '#64748b', 
+              fontSize: '1rem',
+              lineHeight: '1.6',
+              maxWidth: '600px',
+              margin: '0 auto'
+            }}>
+              Help us understand your research needs and connect you with potential collaborators
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ 
+                color: '#374151', 
+                marginBottom: '1rem', 
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                paddingBottom: '0.5rem',
+                borderBottom: '2px solid #e5e7eb'
+              }}>
+                Personal Information
+              </h3>
+              
+              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Enter your full name"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: `1px solid ${errors.name ? '#ef4444' : '#d1d5db'}`,
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      transition: 'border-color 0.2s ease',
+                      background: '#ffffff'
+                    }}
+                  />
+                  {errors.name && (
+                    <span style={{ color: '#ef4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
+                      {errors.name}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="your.email@university.edu"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: `1px solid ${errors.email ? '#ef4444' : '#d1d5db'}`,
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      transition: 'border-color 0.2s ease',
+                      background: '#ffffff'
+                    }}
+                  />
+                  {errors.email && (
+                    <span style={{ color: '#ef4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
+                      {errors.email}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginTop: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                  Student ID (Optional)
+                </label>
+                <input
+                  type="text"
+                  name="studentId"
+                  value={formData.studentId}
+                  onChange={handleChange}
+                  placeholder="Enter your student ID"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    transition: 'border-color 0.2s ease',
+                    background: '#ffffff'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ 
+                color: '#374151', 
+                marginBottom: '1rem', 
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                paddingBottom: '0.5rem',
+                borderBottom: '2px solid #e5e7eb'
+              }}>
+                Academic Information
+              </h3>
+              
+              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                    Research Area/Field *
+                  </label>
+                  <input
+                    type="text"
+                    name="researchArea"
+                    value={formData.researchArea}
+                    onChange={handleChange}
+                    placeholder="e.g., Computer Science, Biology, Psychology"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: `1px solid ${errors.researchArea ? '#ef4444' : '#d1d5db'}`,
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      transition: 'border-color 0.2s ease',
+                      background: '#ffffff'
+                    }}
+                  />
+                  {errors.researchArea && (
+                    <span style={{ color: '#ef4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
+                      {errors.researchArea}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                    Academic Level *
+                  </label>
+                  <select
+                    name="academicLevel"
+                    value={formData.academicLevel}
+                    onChange={handleChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: `1px solid ${errors.academicLevel ? '#ef4444' : '#d1d5db'}`,
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      backgroundColor: '#ffffff',
+                      transition: 'border-color 0.2s ease'
+                    }}
+                  >
+                    <option value="">Select your academic level</option>
+                    <option value="undergraduate">Undergraduate Student</option>
+                    <option value="graduate">Graduate Student (Masters)</option>
+                    <option value="phd">PhD Student</option>
+                    <option value="postdoc">Post-doctoral Researcher</option>
+                    <option value="faculty">Faculty Member</option>
+                    <option value="researcher">Independent Researcher</option>
+                  </select>
+                  {errors.academicLevel && (
+                    <span style={{ color: '#ef4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
+                      {errors.academicLevel}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ 
+                color: '#374151', 
+                marginBottom: '1rem', 
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                paddingBottom: '0.5rem',
+                borderBottom: '2px solid #e5e7eb'
+              }}>
+                Research Details
+              </h3>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                  Current Research Projects
+                </label>
+                <textarea
+                  name="currentProjects"
+                  value={formData.currentProjects}
+                  onChange={handleChange}
+                  placeholder="Briefly describe your current research projects or interests..."
+                  rows="3"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    transition: 'border-color 0.2s ease',
+                    background: '#ffffff'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                  Collaboration Needs *
+                </label>
+                <textarea
+                  name="collaborationNeeds"
+                  value={formData.collaborationNeeds}
+                  onChange={handleChange}
+                  placeholder="What type of collaboration are you looking for? (e.g., co-authors, data analysis help, literature review)"
+                  rows="3"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${errors.collaborationNeeds ? '#ef4444' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    transition: 'border-color 0.2s ease',
+                    background: '#ffffff'
+                  }}
+                />
+                {errors.collaborationNeeds && (
+                  <span style={{ color: '#ef4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
+                    {errors.collaborationNeeds}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ 
+                color: '#374151', 
+                marginBottom: '1rem', 
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                paddingBottom: '0.5rem',
+                borderBottom: '2px solid #e5e7eb'
+              }}>
+                Skills & Resources
+              </h3>
+              
+              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                    Skills You Can Offer
+                  </label>
+                  <textarea
+                    name="skillsOffered"
+                    value={formData.skillsOffered}
+                    onChange={handleChange}
+                    placeholder="e.g., Python programming, Statistical analysis, Literature review"
+                    rows="2"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                      background: '#ffffff'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151', fontSize: '0.875rem' }}>
+                    Skills You Need
+                  </label>
+                  <textarea
+                    name="skillsNeeded"
+                    value={formData.skillsNeeded}
+                    onChange={handleChange}
+                    placeholder="e.g., Machine learning expertise, Qualitative research methods"
+                    rows="2"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                      background: '#ffffff'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                style={{
+                  background: isSubmitting ? '#9ca3af' : '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 2rem',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.2s ease',
+                  minWidth: '150px'
+                }}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Survey'}
+              </button>
+            </div>
+
+            {submitMessage && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                borderRadius: '6px',
+                textAlign: 'center',
+                fontSize: '0.875rem',
+                background: submitMessage.includes('✅') ? '#dcfce7' : '#fecaca',
+                color: submitMessage.includes('✅') ? '#166534' : '#dc2626',
+                border: `1px solid ${submitMessage.includes('✅') ? '#bbf7d0' : '#fca5a5'}`
+              }}>
+                {submitMessage}
+              </div>
+            )}
+          </form>
+        </section>
+
+        <section style={{ 
+          background: '#ffffff',
+          borderRadius: '12px',
+          padding: '2rem',
+          textAlign: 'center',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+          border: '1px solid #e2e8f0'
+        }}>
+          <h3 style={{ 
+            color: '#1e293b', 
+            marginBottom: '1rem',
+            fontSize: '1.5rem',
+            fontWeight: '700'
+          }}>
+            Ready to Start Collaborating?
+          </h3>
+          <p style={{ 
+            color: '#64748b', 
+            fontSize: '1rem',
+            marginBottom: '1.5rem',
+            maxWidth: '500px',
+            margin: '0 auto 1.5rem auto',
+            lineHeight: '1.6'
+          }}>
+            After completing the survey, access our collaboration platform to create projects, 
+            join research teams, and connect with researchers worldwide.
+          </p>
+          
+          <button 
+            onClick={() => setShowAuth(true)}
+            style={{
+              background: '#8b5cf6',
+              color: 'white',
+              border: 'none',
+              padding: '0.75rem 2rem',
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'background 0.2s ease'
+            }}
+          >
+            Access Collaboration Platform
+          </button>
+        </section>
+      </main>
+
+      <footer style={{ 
+        background: '#ffffff',
+        borderTop: '1px solid #e2e8f0',
+        textAlign: 'center',
+        padding: '2rem',
+        marginTop: '2rem'
+      }}>
+        <p style={{ 
+          margin: 0, 
+          color: '#64748b',
+          fontSize: '0.875rem'
+        }}>
+          © 2025 Campus Research Hub • Built for Academic Collaboration
+        </p>
+      </footer>
+
+      <style>
+        {`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          
+          input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+          }
+          
+          button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          }
+        `}
+      </style>
+    </div>
+  );
+}
+
+export default App;

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>Survey API Test</h1>
+    <form id="testForm">
+        <input type="text" id="name" placeholder="Name" required>
+        <input type="email" id="email" placeholder="Email" required>
+        <input type="text" id="researchArea" placeholder="Research Area" required>
+        <select id="academicLevel" required>
+            <option value="">Select Level</option>
+            <option value="graduate">Graduate</option>
+            <option value="undergraduate">Undergraduate</option>
+        </select>
+        <textarea id="collaborationNeeds" placeholder="Collaboration Needs" required></textarea>
+        <button type="submit">Test Submit</button>
+    </form>
+    
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('testForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                researchArea: document.getElementById('researchArea').value,
+                academicLevel: document.getElementById('academicLevel').value,
+                collaborationNeeds: document.getElementById('collaborationNeeds').value
+            };
+            
+            console.log('Sending data:', formData);
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/survey', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                console.log('Response:', result);
+                
+                document.getElementById('result').innerHTML = 
+                    '<h3>Result:</h3><pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                    
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = 
+                    '<h3>Error:</h3><pre>' + error.message + '</pre>';
+            }
+        });
+    </script>
+</body>
+</html>
